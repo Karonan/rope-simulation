@@ -1,0 +1,56 @@
+# Build directories
+build/
+bin/
+out/
+
+# Compiled object files
+*.o
+*.obj
+*.gch
+*.pch
+
+# Compiled dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled static libraries
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+app
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# IDE - VS Code
+.vscode
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IDE - Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.filters
+*.user
+
+# Clangd
+.clangd
+.cache/
+
+# OS specific
+.DS_Store
+Thumbs.db
