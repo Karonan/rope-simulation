@@ -17,6 +17,8 @@ out/
 # Compiled static libraries
 *.a
 *.lib
+!lib/*.a
+!lib/*.lib
 
 # Executables
 *.exe
