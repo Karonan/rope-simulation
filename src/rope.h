@@ -20,15 +20,11 @@ public:
   float restLength = 0.05f;
   int iterations = 10;
 
-  // XPBD parameters
-  bool xpbd = true;
-  float compliance = 0.0001f;
-
   Rope() {
     // Initialize particles
     for (int i = 0; i < numParticles; i++) {
       Particle p;
-      p.pos = glm::vec3(i * restLength, 0.5f, 0.0f);
+      p.pos = glm::vec3(i * restLength, 0.5f, i * 0.01f);
       p.prevPos = p.pos;
       p.pinned = (i == 0); // Pin the first particle
       particles.push_back(p);
@@ -46,7 +42,12 @@ public:
     }
 
     solveConstraints(dt);
+    solvePlaneCollision();
   }
+
+  // MARK: solve constrain
+  bool xpbd = true;
+  float compliance = 0.0001f;
 
   void solveConstraints(float dt) {
     float alpha = compliance / (dt * dt); // compliance / dt^2
@@ -82,6 +83,23 @@ public:
           if (!b.pinned)
             b.pos -= offset;
         }
+      }
+    }
+  }
+
+  // MARK: solve plane collision
+  float floor_y = -0.5f;
+  float restitution = 0.3f; // bounciness, 0 = no bounce
+
+  void solvePlaneCollision() {
+    for (auto &p : particles) {
+      if (p.pinned)
+        continue;
+      if (p.pos.y < floor_y) {
+        // reflect prevPos across the floor to fake bounce
+        float penetration = floor_y - p.pos.y;
+        p.pos.y = floor_y;
+        p.prevPos.y += penetration * restitution;
       }
     }
   }

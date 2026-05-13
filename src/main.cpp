@@ -53,14 +53,8 @@ int main() {
     return -1;
   }
 
-  // MARK: Rope
-  Rope myRope;
-
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
-  ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL3_Init("#version 330");
-
   // Callbacks
   glfwSetFramebufferSizeCallback(window,
                                  [](GLFWwindow *window, int width, int height) {
@@ -69,9 +63,16 @@ int main() {
   glfwSetCursorPosCallback(window, mouse_callback);
   glfwSetScrollCallback(window, scroll_callback);
 
+  ImGui_ImplGlfw_InitForOpenGL(window, true);
+  ImGui_ImplOpenGL3_Init("#version 330");
+
   // Build and compile our shader program
   // Note: Adjust paths if you run the executable from a different directory
   Shader ourShader("../shaders/shader.vs", "../shaders/shader.fs");
+
+  // MARK: VAO, VBO
+  // Rope
+  Rope myRope;
 
   GLuint ropeVAO, ropeVBO;
   glGenVertexArrays(1, &ropeVAO);
@@ -82,6 +83,32 @@ int main() {
                nullptr, GL_DYNAMIC_DRAW);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void *)0);
   glEnableVertexAttribArray(0);
+
+  // Floor
+  float floorSize = 1.0f;
+  float floorHalf = floorSize * 0.5f;
+  float floorVertices[] = {
+      // Positions // Normals
+      floorHalf,  myRope.floor_y, floorHalf,  0.0f, 1.0f, 0.0f, // top right
+      floorHalf,  myRope.floor_y, -floorHalf, 0.0f, 1.0f, 0.0f, // bottom right
+      -floorHalf, myRope.floor_y, -floorHalf, 0.0f, 1.0f, 0.0f, // bottom left
+      -floorHalf, myRope.floor_y, floorHalf,  0.0f, 1.0f, 0.0f  // top left
+  };
+
+  GLuint floorVAO, floorVBO;
+  glGenVertexArrays(1, &floorVAO);
+  glGenBuffers(1, &floorVBO);
+  glBindVertexArray(floorVAO);
+  glBindBuffer(GL_ARRAY_BUFFER, floorVBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(floorVertices), floorVertices,
+               GL_STATIC_DRAW);
+  // Positions
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  // Normals
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
 
   // Unbind
   glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -106,42 +133,52 @@ int main() {
     ImGui::Text("Hello!");
     ImGui::SliderInt("Iterations", &myRope.iterations, 1, 30);
     ImGui::SliderFloat("Damping", &myRope.damping, 0.9f, 1.0f);
+    ImGui::SliderFloat("Bounciness", &myRope.restitution, 0.0f, 1.0f);
     ImGui::Checkbox("XPBD", &myRope.xpbd);
     if (myRope.xpbd) {
       ImGui::SliderFloat("Compliance", &myRope.compliance, 0.0f, 0.01f, "%.5f");
     }
     ImGui::End();
 
-    // Render
+    // MARK: Render
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Activate shader
     ourShader.use();
 
-    // Create transformations
-    glm::mat4 model = glm::mat4(1.0f);
-
-    // pass projection matrix to shader (note that in this case it could change
-    // every frame)
     glm::mat4 projection =
         glm::perspective(glm::radians(camera.Zoom),
                          (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
 
-    ourShader.setMat4("model", model);
+    // Floor
+    ourShader.use();
+    glm::mat4 modelFloor = glm::mat4(1.0f);
+    ourShader.setMat4("model", modelFloor);
     ourShader.setMat4("view", view);
     ourShader.setMat4("projection", projection);
-    ourShader.setVec3("objectColor", 0.0f, 0.7f, 0.9f); // Nice blue color
+    ourShader.setVec3("objectColor", 0.5f, 0.5f, 0.5f); // Grey color
+
+    glBindVertexArray(floorVAO);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
     // Update simulation
     if (deltaTime > 0.0f) {
       myRope.update(deltaTime);
     }
 
+    // Rope
     std::vector<glm::vec3> positions;
     for (auto &p : myRope.particles)
       positions.push_back(p.pos);
+
+    glm::mat4 model = glm::mat4(1.0f);
+
+    ourShader.setMat4("model", model);
+    ourShader.setMat4("view", view);
+    ourShader.setMat4("projection", projection);
+    ourShader.setVec3("objectColor", 0.0f, 0.7f, 0.9f); // Nice blue color
 
     glBindBuffer(GL_ARRAY_BUFFER, ropeVBO);
     glBufferSubData(GL_ARRAY_BUFFER, 0, positions.size() * sizeof(glm::vec3),
