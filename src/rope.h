@@ -154,8 +154,22 @@ public:
       glm::vec3 delta = p.pos - sphereCenter;
       float dist = glm::length(delta);
       if (dist < sphereRadius) {
-        // push particle to sphere surface
-        p.pos = sphereCenter + (delta / dist) * sphereRadius;
+        // Push particle to sphere surface
+        glm::vec3 surface = sphereCenter + (delta / dist) * sphereRadius;
+        
+        // Calculate velocity and normal at collision point
+        glm::vec3 vel = p.pos - p.prevPos;
+        glm::vec3 n = delta / dist; // This is the normal
+        
+        // Separate velocity into components
+        glm::vec3 vNormal = glm::dot(vel, n) * n;
+        glm::vec3 vTangential = vel - vNormal;
+        
+        // Reflect only the normal component
+        glm::vec3 vReflected = vTangential - vNormal * restitution;
+        
+        p.pos = surface;
+        p.prevPos = surface - vReflected;
       }
     }
   }
