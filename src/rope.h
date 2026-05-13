@@ -105,9 +105,9 @@ public:
         continue;
       if (p.pos.y < floor_y) {
         // reflect prevPos across the floor to fake bounce
-        float penetration = floor_y - p.pos.y;
+        float vel_y = (p.pos.y - p.prevPos.y);
         p.pos.y = floor_y;
-        p.prevPos.y += penetration * restitution;
+        p.prevPos.y = floor_y + vel_y * restitution;
       }
     }
   }
