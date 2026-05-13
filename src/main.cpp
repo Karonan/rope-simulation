@@ -11,8 +11,27 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include "camera.h"
 #include "rope.h"
 #include "shader.h"
+
+void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
+void processInput(GLFWwindow *window);
+
+// settings
+const unsigned int SCR_WIDTH = 800;
+const unsigned int SCR_HEIGHT = 600;
+
+// Camera
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+float lastX = SCR_WIDTH / 2.0f;
+float lastY = SCR_HEIGHT / 2.0f;
+bool firstMouse = true;
+
+// timing
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
 
 int main() {
   glfwInit();
@@ -20,8 +39,8 @@ int main() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  GLFWwindow *window =
-      glfwCreateWindow(800, 600, "Rope Simulation", nullptr, nullptr);
+  GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT,
+                                        "Rope Simulation", nullptr, nullptr);
   if (!window) {
     std::cout << "Failed to create GLFW window" << std::endl;
     glfwTerminate();
@@ -42,11 +61,13 @@ int main() {
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init("#version 330");
 
-  // Resize callback
+  // Callbacks
   glfwSetFramebufferSizeCallback(window,
                                  [](GLFWwindow *window, int width, int height) {
                                    glViewport(0, 0, width, height);
                                  });
+  glfwSetCursorPosCallback(window, mouse_callback);
+  glfwSetScrollCallback(window, scroll_callback);
 
   // Build and compile our shader program
   // Note: Adjust paths if you run the executable from a different directory
@@ -67,8 +88,14 @@ int main() {
   glBindVertexArray(0);
 
   // Render loop
-  float lastFrame = 0.0f;
   while (!glfwWindowShouldClose(window)) {
+    // Timing
+    float currentFrame = static_cast<float>(glfwGetTime());
+    deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
+
+    // Input
+    processInput(window);
 
     // MARK: imgui
     ImGui_ImplOpenGL3_NewFrame();
@@ -85,10 +112,6 @@ int main() {
     }
     ImGui::End();
 
-    // Input
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-      glfwSetWindowShouldClose(window, true);
-
     // Render
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -98,23 +121,18 @@ int main() {
 
     // Create transformations
     glm::mat4 model = glm::mat4(1.0f);
-    glm::mat4 view = glm::mat4(1.0f);
-    glm::mat4 projection = glm::mat4(1.0f);
 
-    // For now, let's just use identity matrices or a simple ortho
-    // projection = glm::perspective(glm::radians(45.0f), (float)800 /
-    // (float)600, 0.1f, 100.0f); view = glm::translate(view, glm::vec3(0.0f,
-    // 0.0f, -3.0f));
+    // pass projection matrix to shader (note that in this case it could change
+    // every frame)
+    glm::mat4 projection =
+        glm::perspective(glm::radians(camera.Zoom),
+                         (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    glm::mat4 view = camera.GetViewMatrix();
 
     ourShader.setMat4("model", model);
     ourShader.setMat4("view", view);
     ourShader.setMat4("projection", projection);
     ourShader.setVec3("objectColor", 0.0f, 0.7f, 0.9f); // Nice blue color
-
-    // MARK: Draw rope
-    float currentFrame = glfwGetTime();
-    float deltaTime = currentFrame - lastFrame;
-    lastFrame = currentFrame;
 
     // Update simulation
     if (deltaTime > 0.0f) {
@@ -151,4 +169,59 @@ int main() {
 
   glfwTerminate();
   return 0;
+}
+
+// process all input: query GLFW whether relevant keys are pressed/released this
+// frame and react accordingly
+// ---------------------------------------------------------------------------------------------------------
+void processInput(GLFWwindow *window) {
+  if (ImGui::GetIO().WantCaptureKeyboard)
+    return;
+
+  if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    glfwSetWindowShouldClose(window, true);
+
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    camera.ProcessKeyboard(FORWARD, deltaTime);
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    camera.ProcessKeyboard(BACKWARD, deltaTime);
+  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    camera.ProcessKeyboard(LEFT, deltaTime);
+  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    camera.ProcessKeyboard(RIGHT, deltaTime);
+}
+
+// glfw: whenever the mouse moves, this callback is called
+// -------------------------------------------------------
+void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
+  if (ImGui::GetIO().WantCaptureMouse)
+    return;
+
+  float xpos = static_cast<float>(xposIn);
+  float ypos = static_cast<float>(yposIn);
+
+  if (firstMouse) {
+    lastX = xpos;
+    lastY = ypos;
+    firstMouse = false;
+  }
+
+  float xoffset = xpos - lastX;
+  float yoffset =
+      lastY - ypos; // reversed since y-coordinates go from bottom to top
+
+  lastX = xpos;
+  lastY = ypos;
+
+  if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+    camera.ProcessMouseMovement(xoffset, yoffset);
+  }
+}
+
+// glfw: whenever the mouse scroll wheel scrolls, this callback is called
+// ----------------------------------------------------------------------
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
+  if (ImGui::GetIO().WantCaptureMouse)
+    return;
+  camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
