@@ -11,6 +11,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include "rope.h"
 #include "shader.h"
 
 int main() {
@@ -33,6 +34,9 @@ int main() {
     return -1;
   }
 
+  // MARK: Rope
+  Rope myRope;
+
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -48,25 +52,14 @@ int main() {
   // Note: Adjust paths if you run the executable from a different directory
   Shader ourShader("../shaders/shader.vs", "../shaders/shader.fs");
 
-  // Triangle vertices
-  float vertices[] = {
-      -0.5f, -0.5f, 0.0f, // left
-      0.5f,  -0.5f, 0.0f, // right
-      0.0f,  0.5f,  0.0f  // top
-  };
-
-  unsigned int VBO, VAO;
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-
-  // Bind the Vertex Array Object first, then bind and set vertex buffer(s), and
-  // then configure vertex attributes(s).
-  glBindVertexArray(VAO);
-
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
+  GLuint ropeVAO, ropeVBO;
+  glGenVertexArrays(1, &ropeVAO);
+  glGenBuffers(1, &ropeVBO);
+  glBindVertexArray(ropeVAO);
+  glBindBuffer(GL_ARRAY_BUFFER, ropeVBO);
+  glBufferData(GL_ARRAY_BUFFER, myRope.particles.size() * sizeof(glm::vec3),
+               nullptr, GL_DYNAMIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void *)0);
   glEnableVertexAttribArray(0);
 
   // Unbind
@@ -74,13 +67,18 @@ int main() {
   glBindVertexArray(0);
 
   // Render loop
+  float lastFrame = 0.0f;
   while (!glfwWindowShouldClose(window)) {
+
+    // MARK: imgui
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
     ImGui::Begin("Rope Params");
     ImGui::Text("Hello!");
+    ImGui::SliderInt("Iterations", &myRope.iterations, 1, 30);
+    ImGui::SliderFloat("Damping", &myRope.damping, 0.9f, 1.0f);
     ImGui::End();
 
     // Input
@@ -109,9 +107,27 @@ int main() {
     ourShader.setMat4("projection", projection);
     ourShader.setVec3("objectColor", 0.0f, 0.7f, 0.9f); // Nice blue color
 
-    // Draw triangle
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    // MARK: Draw rope
+    float currentFrame = glfwGetTime();
+    float deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
+
+    // Update simulation
+    if (deltaTime > 0.0f) {
+      myRope.update(deltaTime);
+    }
+
+    std::vector<glm::vec3> positions;
+    for (auto &p : myRope.particles)
+      positions.push_back(p.pos);
+
+    glBindBuffer(GL_ARRAY_BUFFER, ropeVBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, positions.size() * sizeof(glm::vec3),
+                    positions.data());
+
+    glUseProgram(ourShader.ID);
+    glBindVertexArray(ropeVAO);
+    glDrawArrays(GL_LINE_STRIP, 0, myRope.particles.size());
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -122,8 +138,8 @@ int main() {
   }
 
   // De-allocate resources
-  glDeleteVertexArrays(1, &VAO);
-  glDeleteBuffers(1, &VBO);
+  glDeleteVertexArrays(1, &ropeVAO);
+  glDeleteBuffers(1, &ropeVBO);
 
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
