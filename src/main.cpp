@@ -79,6 +79,10 @@ int main() {
     ImGui::Text("Hello!");
     ImGui::SliderInt("Iterations", &myRope.iterations, 1, 30);
     ImGui::SliderFloat("Damping", &myRope.damping, 0.9f, 1.0f);
+    ImGui::Checkbox("XPBD", &myRope.xpbd);
+    if (myRope.xpbd) {
+      ImGui::SliderFloat("Compliance", &myRope.compliance, 0.0f, 0.01f, "%.5f");
+    }
     ImGui::End();
 
     // Input

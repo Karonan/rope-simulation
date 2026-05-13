@@ -20,6 +20,10 @@ public:
   float restLength = 0.05f;
   int iterations = 10;
 
+  // XPBD parameters
+  bool xpbd = true;
+  float compliance = 0.0001f;
+
   Rope() {
     // Initialize particles
     for (int i = 0; i < numParticles; i++) {
@@ -41,10 +45,12 @@ public:
       p.pos += vel + gravity * dt * dt;
     }
 
-    solveConstraints();
+    solveConstraints(dt);
   }
 
-  void solveConstraints() {
+  void solveConstraints(float dt) {
+    float alpha = compliance / (dt * dt); // compliance / dt^2
+
     for (int iter = 0; iter < iterations; iter++) {
       for (int i = 0; i < (int)particles.size() - 1; i++) {
         Particle &a = particles[i];
@@ -55,13 +61,27 @@ public:
         if (dist < 1e-6f)
           continue;
 
-        float correction = (dist - restLength) / dist;
-        glm::vec3 offset = delta * 0.5f * correction;
+        if (xpbd) {
+          float C = dist - restLength;       // constraint violation
+          float wA = a.pinned ? 0.0f : 1.0f; // inverse mass
+          float wB = b.pinned ? 0.0f : 1.0f;
+          float lambda = -C / (wA + wB + alpha);
+          glm::vec3 correction = lambda * (delta / dist);
 
-        if (!a.pinned)
-          a.pos += offset;
-        if (!b.pinned)
-          b.pos -= offset;
+          if (!a.pinned)
+            a.pos -= correction * wA;
+          if (!b.pinned)
+            b.pos += correction * wB;
+
+        } else {
+          float correction = (dist - restLength) / dist;
+          glm::vec3 offset = delta * 0.5f * correction;
+
+          if (!a.pinned)
+            a.pos += offset;
+          if (!b.pinned)
+            b.pos -= offset;
+        }
       }
     }
   }
