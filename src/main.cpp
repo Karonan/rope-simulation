@@ -53,6 +53,8 @@ int main() {
     return -1;
   }
 
+  glEnable(GL_DEPTH_TEST);
+
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   // Callbacks
@@ -142,7 +144,7 @@ int main() {
 
     // MARK: Render
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Activate shader
     ourShader.use();
@@ -158,7 +160,14 @@ int main() {
     ourShader.setMat4("model", modelFloor);
     ourShader.setMat4("view", view);
     ourShader.setMat4("projection", projection);
-    ourShader.setVec3("objectColor", 0.5f, 0.5f, 0.5f); // Grey color
+
+    // Lighting uniforms
+    glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+    ourShader.setVec3("lightPos", lightPos);
+    ourShader.setVec3("viewPos", camera.Position);
+    ourShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
+    ourShader.setVec3("objectColor", 0.5f, 0.5f, 0.5f);
+    ourShader.setBool("useLighting", true);
 
     glBindVertexArray(floorVAO);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
@@ -179,6 +188,7 @@ int main() {
     ourShader.setMat4("view", view);
     ourShader.setMat4("projection", projection);
     ourShader.setVec3("objectColor", 0.0f, 0.7f, 0.9f); // Nice blue color
+    ourShader.setBool("useLighting", false);
 
     glBindBuffer(GL_ARRAY_BUFFER, ropeVBO);
     glBufferSubData(GL_ARRAY_BUFFER, 0, positions.size() * sizeof(glm::vec3),
