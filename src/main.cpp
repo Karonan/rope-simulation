@@ -7,6 +7,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
 #include "shader.h"
 
 int main() {
@@ -15,7 +19,8 @@ int main() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  GLFWwindow *window = glfwCreateWindow(800, 600, "Rope Simulation", nullptr, nullptr);
+  GLFWwindow *window =
+      glfwCreateWindow(800, 600, "Rope Simulation", nullptr, nullptr);
   if (!window) {
     std::cout << "Failed to create GLFW window" << std::endl;
     glfwTerminate();
@@ -27,6 +32,11 @@ int main() {
     std::cout << "Failed to initialize GLAD" << std::endl;
     return -1;
   }
+
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGui_ImplGlfw_InitForOpenGL(window, true);
+  ImGui_ImplOpenGL3_Init("#version 330");
 
   // Resize callback
   glfwSetFramebufferSizeCallback(window,
@@ -41,15 +51,16 @@ int main() {
   // Triangle vertices
   float vertices[] = {
       -0.5f, -0.5f, 0.0f, // left
-       0.5f, -0.5f, 0.0f, // right
-       0.0f,  0.5f, 0.0f  // top
+      0.5f,  -0.5f, 0.0f, // right
+      0.0f,  0.5f,  0.0f  // top
   };
 
   unsigned int VBO, VAO;
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
 
-  // Bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
+  // Bind the Vertex Array Object first, then bind and set vertex buffer(s), and
+  // then configure vertex attributes(s).
   glBindVertexArray(VAO);
 
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -64,6 +75,14 @@ int main() {
 
   // Render loop
   while (!glfwWindowShouldClose(window)) {
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::Begin("Rope Params");
+    ImGui::Text("Hello!");
+    ImGui::End();
+
     // Input
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
       glfwSetWindowShouldClose(window, true);
@@ -79,10 +98,11 @@ int main() {
     glm::mat4 model = glm::mat4(1.0f);
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 projection = glm::mat4(1.0f);
-    
+
     // For now, let's just use identity matrices or a simple ortho
-    // projection = glm::perspective(glm::radians(45.0f), (float)800 / (float)600, 0.1f, 100.0f);
-    // view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+    // projection = glm::perspective(glm::radians(45.0f), (float)800 /
+    // (float)600, 0.1f, 100.0f); view = glm::translate(view, glm::vec3(0.0f,
+    // 0.0f, -3.0f));
 
     ourShader.setMat4("model", model);
     ourShader.setMat4("view", view);
@@ -93,6 +113,9 @@ int main() {
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
     // Swap buffers and poll IO events
     glfwSwapBuffers(window);
     glfwPollEvents();
@@ -101,6 +124,10 @@ int main() {
   // De-allocate resources
   glDeleteVertexArrays(1, &VAO);
   glDeleteBuffers(1, &VBO);
+
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
 
   glfwTerminate();
   return 0;
