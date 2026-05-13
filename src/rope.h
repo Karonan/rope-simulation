@@ -31,6 +31,9 @@ public:
     }
   }
 
+  bool showFloor = true;
+  bool showSphere = true;
+
   void update(float dt) {
     // 1. Verlet Integration
     for (auto &p : particles) {
@@ -42,8 +45,12 @@ public:
     }
 
     solveConstraints(dt);
-    solvePlaneCollision();
-    solveSphereCollision();
+    if (showFloor) {
+      solvePlaneCollision();
+    }
+    if (showSphere) {
+      solveSphereCollision();
+    }
   }
 
   // MARK: solve constrain
@@ -119,10 +126,11 @@ public:
         float theta1 = 2.0f * M_PI * (j + 1) / slices;
 
         auto pushVert = [&](float phi, float theta) {
-          glm::vec3 p = sphereCenter + glm::vec3(sphereRadius * cos(phi) * cos(theta),
-                                                 sphereRadius * sin(phi),
-                                                 sphereRadius * cos(phi) * sin(theta));
-          data.push_back(p);                      // Position
+          glm::vec3 p =
+              sphereCenter + glm::vec3(sphereRadius * cos(phi) * cos(theta),
+                                       sphereRadius * sin(phi),
+                                       sphereRadius * cos(phi) * sin(theta));
+          data.push_back(p);                                // Position
           data.push_back(glm::normalize(p - sphereCenter)); // Normal
         };
 

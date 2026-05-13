@@ -122,10 +122,12 @@ int main() {
   glBufferData(GL_ARRAY_BUFFER, sphereData.size() * sizeof(glm::vec3),
                sphereData.data(), GL_STATIC_DRAW);
   // Positions
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 2 * sizeof(glm::vec3), (void *)0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 2 * sizeof(glm::vec3),
+                        (void *)0);
   glEnableVertexAttribArray(0);
   // Normals
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 2 * sizeof(glm::vec3), (void *)(sizeof(glm::vec3)));
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 2 * sizeof(glm::vec3),
+                        (void *)(sizeof(glm::vec3)));
   glEnableVertexAttribArray(1);
 
   // Unbind
@@ -156,6 +158,8 @@ int main() {
     if (myRope.xpbd) {
       ImGui::SliderFloat("Compliance", &myRope.compliance, 0.0f, 0.01f, "%.5f");
     }
+    ImGui::Checkbox("Show Floor", &myRope.showFloor);
+    ImGui::Checkbox("Show Sphere", &myRope.showSphere);
     ImGui::End();
 
     // MARK: Render
@@ -170,34 +174,37 @@ int main() {
                          (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
 
-    // // Floor
-    // ourShader.use();
-    // glm::mat4 modelFloor = glm::mat4(1.0f);
-    // ourShader.setMat4("model", modelFloor);
-    // ourShader.setMat4("view", view);
-    // ourShader.setMat4("projection", projection);
-
     // Lighting uniforms
     glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
     ourShader.setVec3("lightPos", lightPos);
     ourShader.setVec3("viewPos", camera.Position);
     ourShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
-    ourShader.setVec3("objectColor", 0.5f, 0.5f, 0.5f);
-    ourShader.setBool("useLighting", true);
 
-    // glBindVertexArray(floorVAO);
-    // glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    // Floor
+    if (myRope.showFloor) {
+      ourShader.setVec3("objectColor", 0.5f, 0.5f, 0.5f);
+      glm::mat4 modelFloor = glm::mat4(1.0f);
+      ourShader.setMat4("model", modelFloor);
+      ourShader.setMat4("view", view);
+      ourShader.setMat4("projection", projection);
+      ourShader.setBool("useLighting", true);
+
+      glBindVertexArray(floorVAO);
+      glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    }
 
     // Sphere
-    glm::mat4 modelSphere = glm::mat4(1.0f);
-    ourShader.setMat4("model", modelSphere);
-    ourShader.setMat4("view", view);
-    ourShader.setMat4("projection", projection);
-    ourShader.setBool("useLighting", true);
-    ourShader.setVec3("objectColor", 0.7f, 0.5f, 0.5f);
+    if (myRope.showSphere) {
+      glm::mat4 modelSphere = glm::mat4(1.0f);
+      ourShader.setMat4("model", modelSphere);
+      ourShader.setMat4("view", view);
+      ourShader.setMat4("projection", projection);
+      ourShader.setBool("useLighting", true);
+      ourShader.setVec3("objectColor", 0.7f, 0.5f, 0.5f);
 
-    glBindVertexArray(sphereVAO);
-    glDrawArrays(GL_TRIANGLES, 0, sphereData.size() / 2);
+      glBindVertexArray(sphereVAO);
+      glDrawArrays(GL_TRIANGLES, 0, sphereData.size() / 2);
+    }
 
     // Update simulation
     if (deltaTime > 0.0f) {
