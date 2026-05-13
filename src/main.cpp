@@ -18,6 +18,7 @@
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+glm::vec3 GetRayFromMouse(double mouseX, double mouseY, int screenWidth, int screenHeight, const glm::mat4& view, const glm::mat4& projection);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -160,6 +161,62 @@ int main() {
     // Input
     processInput(window);
 
+    glm::mat4 projection =
+        glm::perspective(glm::radians(camera.Zoom),
+                         (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    glm::mat4 view = camera.GetViewMatrix();
+
+    static int draggedParticle = -1;
+    static float dragDepth = 0.0f;
+
+    if (!ImGui::GetIO().WantCaptureMouse) {
+      double mouseX, mouseY;
+      glfwGetCursorPos(window, &mouseX, &mouseY);
+      int winWidth, winHeight;
+      glfwGetWindowSize(window, &winWidth, &winHeight);
+
+      if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        glm::vec3 rayDir = GetRayFromMouse(mouseX, mouseY, winWidth, winHeight, view, projection);
+        glm::vec3 rayOrigin = camera.Position;
+
+        if (draggedParticle == -1) {
+          float minVal = 0.2f; // Grab radius
+          int bestId = -1;
+          float bestT = -1.0f;
+          for (int i = 0; i < myRope.particles.size(); i++) {
+            glm::vec3 p = myRope.particles[i].pos;
+            glm::vec3 v = p - rayOrigin;
+            float t = glm::dot(v, rayDir);
+            if (t > 0) {
+              float dist = glm::length(glm::cross(v, rayDir));
+              if (dist < minVal) {
+                minVal = dist;
+                bestId = i;
+                bestT = t;
+              }
+            }
+          }
+          if (bestId != -1) {
+            draggedParticle = bestId;
+            dragDepth = bestT;
+            myRope.particles[draggedParticle].pinned = true;
+          }
+        }
+
+        if (draggedParticle != -1) {
+          glm::vec3 targetPos = rayOrigin + rayDir * dragDepth;
+          myRope.particles[draggedParticle].pos = targetPos;
+          myRope.particles[draggedParticle].prevPos = targetPos;
+        }
+      } else {
+        if (draggedParticle != -1) {
+          myRope.particles[draggedParticle].pinned =
+              (draggedParticle == 0 || (draggedParticle == myRope.numParticles - 1 && myRope.pinLast));
+          draggedParticle = -1;
+        }
+      }
+    }
+
     // MARK: imgui
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -203,10 +260,8 @@ int main() {
     // Activate shader
     ourShader.use();
 
-    glm::mat4 projection =
-        glm::perspective(glm::radians(camera.Zoom),
-                         (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    glm::mat4 view = camera.GetViewMatrix();
+    // Activate shader
+    ourShader.use();
 
     // Lighting uniforms
     glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
@@ -319,9 +374,20 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
   lastX = xpos;
   lastY = ypos;
 
-  if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+  if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
     camera.ProcessMouseMovement(xoffset, yoffset);
   }
+}
+
+glm::vec3 GetRayFromMouse(double mouseX, double mouseY, int screenWidth, int screenHeight, const glm::mat4& view, const glm::mat4& projection) {
+  float x = (2.0f * mouseX) / screenWidth - 1.0f;
+  float y = 1.0f - (2.0f * mouseY) / screenHeight;
+
+  glm::vec4 ray_clip = glm::vec4(x, y, -1.0f, 1.0f);
+  glm::vec4 ray_eye = glm::inverse(projection) * ray_clip;
+  ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f);
+  glm::vec3 ray_wor = glm::vec3(glm::inverse(view) * ray_eye);
+  return glm::normalize(ray_wor);
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called

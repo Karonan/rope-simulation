@@ -15,7 +15,7 @@ public:
   std::vector<Particle> particles;
 
   int numParticles = 20;
-  float damping = 0.99f;
+  float damping = 0.95f;
   glm::vec3 gravity = glm::vec3(0.0f, -9.8f, 0.0f);
   float restLength = 0.05f;
   bool pinLast = false;
