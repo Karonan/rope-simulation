@@ -86,6 +86,22 @@ int main() {
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void *)0);
   glEnableVertexAttribArray(0);
 
+  // Tube for each particle
+  GLuint tubeVAO, tubeVBO;
+  glGenVertexArrays(1, &tubeVAO);
+  glGenBuffers(1, &tubeVBO);
+  glBindVertexArray(tubeVAO);
+  glBindBuffer(GL_ARRAY_BUFFER, tubeVBO);
+  glBufferData(GL_ARRAY_BUFFER, 1024 * 1024, nullptr, GL_DYNAMIC_DRAW);
+  // Position attribute
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 2 * sizeof(glm::vec3),
+                        (void *)0);
+  glEnableVertexAttribArray(0);
+  // Normal attribute
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 2 * sizeof(glm::vec3),
+                        (void *)(sizeof(glm::vec3)));
+  glEnableVertexAttribArray(1);
+
   // Floor
   float floorSize = 1.0f;
   float floorHalf = floorSize * 0.5f;
@@ -150,7 +166,11 @@ int main() {
     ImGui::NewFrame();
 
     ImGui::Begin("Rope Params");
-    ImGui::Text("Hello!");
+    ImGui::Text("Rope Parameters");
+    if (ImGui::SliderInt("Num Particles", &myRope.numParticles, 5, 50)) {
+      myRope.reset();
+    }
+    ImGui::SliderFloat("Rest Length", &myRope.restLength, 0.01f, 0.2f, "%.5f");
     ImGui::SliderInt("Iterations", &myRope.iterations, 1, 30);
     ImGui::SliderFloat("Damping", &myRope.damping, 0.9f, 1.0f);
     ImGui::SliderFloat("Bounciness", &myRope.restitution, 0.0f, 1.0f);
@@ -158,8 +178,14 @@ int main() {
     if (myRope.xpbd) {
       ImGui::SliderFloat("Compliance", &myRope.compliance, 0.0f, 0.01f, "%.5f");
     }
+
+    ImGui::Text("Object Collisions");
     ImGui::Checkbox("Show Floor", &myRope.showFloor);
     ImGui::Checkbox("Show Sphere", &myRope.showSphere);
+
+    ImGui::Text("Visual Parameters");
+    ImGui::SliderFloat("Tube Radius", &myRope.tubeRadius, 0.0f, 0.05f, "%.5f");
+    ImGui::SliderInt("Tube Sides", &myRope.tubeSides, 3, 20);
     ImGui::End();
 
     // MARK: Render
@@ -212,25 +238,17 @@ int main() {
     }
 
     // Rope
-    std::vector<glm::vec3> positions;
-    for (auto &p : myRope.particles)
-      positions.push_back(p.pos);
+    ourShader.setBool("useLighting", true);
+    ourShader.setVec3("objectColor", 0.3f, 0.6f, 0.9f); // Blueish rope
+    ourShader.setMat4("model", glm::mat4(1.0f));
 
-    glm::mat4 model = glm::mat4(1.0f);
+    auto tubeMesh = myRope.generateTube(myRope.particles);
+    glBindBuffer(GL_ARRAY_BUFFER, tubeVBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, tubeMesh.size() * sizeof(glm::vec3),
+                    tubeMesh.data());
 
-    ourShader.setMat4("model", model);
-    ourShader.setMat4("view", view);
-    ourShader.setMat4("projection", projection);
-    ourShader.setVec3("objectColor", 0.0f, 0.7f, 0.9f); // Nice blue color
-    ourShader.setBool("useLighting", false);
-
-    glBindBuffer(GL_ARRAY_BUFFER, ropeVBO);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, positions.size() * sizeof(glm::vec3),
-                    positions.data());
-
-    glUseProgram(ourShader.ID);
-    glBindVertexArray(ropeVAO);
-    glDrawArrays(GL_LINE_STRIP, 0, myRope.particles.size());
+    glBindVertexArray(tubeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(tubeMesh.size() / 2));
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

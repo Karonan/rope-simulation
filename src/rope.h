@@ -21,7 +21,11 @@ public:
   int iterations = 10;
 
   Rope() {
-    // Initialize particles
+    reset();
+  }
+
+  void reset() {
+    particles.clear();
     for (int i = 0; i < numParticles; i++) {
       Particle p;
       p.pos = glm::vec3(i * restLength, 0.5f, i * 0.01f);
@@ -51,6 +55,70 @@ public:
     if (showSphere) {
       solveSphereCollision();
     }
+  }
+
+  // MARK: render tube
+  float tubeRadius = 0.01f;
+  int tubeSides = 10;
+
+  std::vector<glm::vec3> generateTube(const std::vector<Particle> &particles) {
+    std::vector<glm::vec3> verts;
+
+    struct VertexData {
+      glm::vec3 pos;
+      glm::vec3 norm;
+    };
+
+    auto getRing = [&](int i) {
+      // tangent along rope
+      glm::vec3 tangent;
+      if (i == 0)
+        tangent = glm::normalize(particles[1].pos - particles[0].pos);
+      else if (i == (int)particles.size() - 1)
+        tangent = glm::normalize(particles[i].pos - particles[i - 1].pos);
+      else
+        tangent = glm::normalize(particles[i + 1].pos - particles[i - 1].pos);
+
+      // perpendicular frame
+      glm::vec3 up = glm::vec3(0, 1, 0);
+      if (glm::abs(glm::dot(tangent, up)) > 0.99f)
+        up = glm::vec3(1, 0, 0);
+      glm::vec3 normal = glm::normalize(glm::cross(tangent, up));
+      glm::vec3 binormal = glm::cross(tangent, normal);
+
+      std::vector<VertexData> ring;
+      for (int j = 0; j < tubeSides; j++) {
+        float angle = 2.0f * M_PI * j / tubeSides;
+        glm::vec3 unitOffset =
+            (float(cos(angle)) * normal + float(sin(angle)) * binormal);
+        ring.push_back(
+            {particles[i].pos + tubeRadius * unitOffset, unitOffset});
+      }
+      return ring;
+    };
+
+    for (int i = 0; i < (int)particles.size() - 1; i++) {
+      auto r0 = getRing(i);
+      auto r1 = getRing(i + 1);
+      for (int j = 0; j < tubeSides; j++) {
+        int next = (j + 1) % tubeSides;
+        // Triangle 1
+        verts.push_back(r0[j].pos);
+        verts.push_back(r0[j].norm);
+        verts.push_back(r1[j].pos);
+        verts.push_back(r1[j].norm);
+        verts.push_back(r1[next].pos);
+        verts.push_back(r1[next].norm);
+        // Triangle 2
+        verts.push_back(r0[j].pos);
+        verts.push_back(r0[j].norm);
+        verts.push_back(r1[next].pos);
+        verts.push_back(r1[next].norm);
+        verts.push_back(r0[next].pos);
+        verts.push_back(r0[next].norm);
+      }
+    }
+    return verts;
   }
 
   // MARK: solve constrain
@@ -156,18 +224,18 @@ public:
       if (dist < sphereRadius) {
         // Push particle to sphere surface
         glm::vec3 surface = sphereCenter + (delta / dist) * sphereRadius;
-        
+
         // Calculate velocity and normal at collision point
         glm::vec3 vel = p.pos - p.prevPos;
         glm::vec3 n = delta / dist; // This is the normal
-        
+
         // Separate velocity into components
         glm::vec3 vNormal = glm::dot(vel, n) * n;
         glm::vec3 vTangential = vel - vNormal;
-        
+
         // Reflect only the normal component
         glm::vec3 vReflected = vTangential - vNormal * restitution;
-        
+
         p.pos = surface;
         p.prevPos = surface - vReflected;
       }
