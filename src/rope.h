@@ -43,6 +43,7 @@ public:
 
     solveConstraints(dt);
     solvePlaneCollision();
+    solveSphereCollision();
   }
 
   // MARK: solve constrain
@@ -100,6 +101,53 @@ public:
         float penetration = floor_y - p.pos.y;
         p.pos.y = floor_y;
         p.prevPos.y += penetration * restitution;
+      }
+    }
+  }
+
+  // MARK: solve sphere collision
+  glm::vec3 sphereCenter = glm::vec3(0.0f, 0.0f, 0.0f);
+  float sphereRadius = 0.2f;
+
+  std::vector<glm::vec3> genSphereMesh(int stacks, int slices) {
+    std::vector<glm::vec3> data;
+    for (int i = 0; i < stacks; i++) {
+      float phi0 = M_PI * i / stacks - M_PI / 2.0f;
+      float phi1 = M_PI * (i + 1) / stacks - M_PI / 2.0f;
+      for (int j = 0; j < slices; j++) {
+        float theta0 = 2.0f * M_PI * j / slices;
+        float theta1 = 2.0f * M_PI * (j + 1) / slices;
+
+        auto pushVert = [&](float phi, float theta) {
+          glm::vec3 p = sphereCenter + glm::vec3(sphereRadius * cos(phi) * cos(theta),
+                                                 sphereRadius * sin(phi),
+                                                 sphereRadius * cos(phi) * sin(theta));
+          data.push_back(p);                      // Position
+          data.push_back(glm::normalize(p - sphereCenter)); // Normal
+        };
+
+        // two triangles per quad
+        pushVert(phi0, theta0);
+        pushVert(phi1, theta0);
+        pushVert(phi1, theta1);
+
+        pushVert(phi0, theta0);
+        pushVert(phi1, theta1);
+        pushVert(phi0, theta1);
+      }
+    }
+    return data;
+  }
+
+  void solveSphereCollision() {
+    for (auto &p : particles) {
+      if (p.pinned)
+        continue;
+      glm::vec3 delta = p.pos - sphereCenter;
+      float dist = glm::length(delta);
+      if (dist < sphereRadius) {
+        // push particle to sphere surface
+        p.pos = sphereCenter + (delta / dist) * sphereRadius;
       }
     }
   }
