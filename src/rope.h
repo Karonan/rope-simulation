@@ -18,11 +18,10 @@ public:
   float damping = 0.99f;
   glm::vec3 gravity = glm::vec3(0.0f, -9.8f, 0.0f);
   float restLength = 0.05f;
-  int iterations = 10;
+  bool pinLast = false;
+  float timeScale = 1.0f; // Multiplier for simulation time step
 
-  Rope() {
-    reset();
-  }
+  Rope() { reset(); }
 
   void reset() {
     particles.clear();
@@ -30,30 +29,8 @@ public:
       Particle p;
       p.pos = glm::vec3(i * restLength, 0.5f, i * 0.01f);
       p.prevPos = p.pos;
-      p.pinned = (i == 0); // Pin the first particle
+      p.pinned = (i == 0 || i == numParticles - 1 && pinLast);
       particles.push_back(p);
-    }
-  }
-
-  bool showFloor = true;
-  bool showSphere = true;
-
-  void update(float dt) {
-    // 1. Verlet Integration
-    for (auto &p : particles) {
-      if (p.pinned)
-        continue;
-      glm::vec3 vel = (p.pos - p.prevPos) * damping;
-      p.prevPos = p.pos;
-      p.pos += vel + gravity * dt * dt;
-    }
-
-    solveConstraints(dt);
-    if (showFloor) {
-      solvePlaneCollision();
-    }
-    if (showSphere) {
-      solveSphereCollision();
     }
   }
 
@@ -121,14 +98,53 @@ public:
     return verts;
   }
 
+  // MARK: update
+  bool showFloor = true;
+  bool showSphere = true;
+  bool enableGravity = true;
+  int subSteps = 10;
+
+  void update(float dt) {
+    float simDt = dt * timeScale;
+    float subDt = simDt / subSteps;
+
+    // Adjust damping so it behaves similarly regardless of sub-steps
+    float subDamping = std::pow(damping, 1.0f / subSteps);
+
+    for (int s = 0; s < subSteps; s++) {
+      // 1. Verlet Integration
+      for (auto &p : particles) {
+        if (p.pinned)
+          continue;
+        glm::vec3 vel = (p.pos - p.prevPos) * subDamping;
+        p.prevPos = p.pos;
+        if (enableGravity)
+          p.pos += vel + gravity * subDt * subDt;
+        else
+          p.pos += vel;
+      }
+
+      // 2. Solve Constraints (1 iteration per sub-step is standard for XPBD)
+      solveConstraints(subDt, 1);
+
+      // 3. Collisions
+      if (showFloor) {
+        solvePlaneCollision();
+      }
+      if (showSphere) {
+        solveSphereCollision();
+      }
+    }
+  }
   // MARK: solve constrain
   bool xpbd = true;
   float compliance = 0.0001f;
 
-  void solveConstraints(float dt) {
+  void solveConstraints(float dt, int iters) {
     float alpha = compliance / (dt * dt); // compliance / dt^2
+    std::vector<float> lambdas(particles.size() - 1, 0.0f);
 
-    for (int iter = 0; iter < iterations; iter++) {
+    for (int iter = 0; iter < iters; iter++) {
       for (int i = 0; i < (int)particles.size() - 1; i++) {
         Particle &a = particles[i];
         Particle &b = particles[i + 1];
@@ -142,8 +158,13 @@ public:
           float C = dist - restLength;       // constraint violation
           float wA = a.pinned ? 0.0f : 1.0f; // inverse mass
           float wB = b.pinned ? 0.0f : 1.0f;
-          float lambda = -C / (wA + wB + alpha);
-          glm::vec3 correction = lambda * (delta / dist);
+
+          // XPBD update: delta_lambda = (-C - alpha * lambda_total) / (sum_w +
+          // alpha)
+          float dLambda = (-C - alpha * lambdas[i]) / (wA + wB + alpha);
+          lambdas[i] += dLambda;
+
+          glm::vec3 correction = dLambda * (delta / dist);
 
           if (!a.pinned)
             a.pos -= correction * wA;

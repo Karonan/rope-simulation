@@ -171,18 +171,26 @@ int main() {
       myRope.reset();
     }
     ImGui::SliderFloat("Rest Length", &myRope.restLength, 0.01f, 0.2f, "%.5f");
-    ImGui::SliderInt("Iterations", &myRope.iterations, 1, 30);
+    ImGui::SliderInt("Substeps", &myRope.subSteps, 1, 30);
     ImGui::SliderFloat("Damping", &myRope.damping, 0.9f, 1.0f);
     ImGui::SliderFloat("Bounciness", &myRope.restitution, 0.0f, 1.0f);
     ImGui::Checkbox("XPBD", &myRope.xpbd);
     if (myRope.xpbd) {
       ImGui::SliderFloat("Compliance", &myRope.compliance, 0.0f, 0.01f, "%.5f");
     }
+    ImGui::SliderFloat("Physics Time Scale", &myRope.timeScale, 1.0f, 20.0f,
+                       "%.1fx");
 
-    ImGui::Text("Object Collisions");
+    ImGui::Separator();
+    ImGui::Text("Scenarios");
     ImGui::Checkbox("Show Floor", &myRope.showFloor);
     ImGui::Checkbox("Show Sphere", &myRope.showSphere);
+    if (ImGui::Checkbox("Pin Last", &myRope.pinLast)) {
+      myRope.reset();
+    }
+    ImGui::Checkbox("Enable Gravity", &myRope.enableGravity);
 
+    ImGui::Separator();
     ImGui::Text("Visual Parameters");
     ImGui::SliderFloat("Tube Radius", &myRope.tubeRadius, 0.0f, 0.05f, "%.5f");
     ImGui::SliderInt("Tube Sides", &myRope.tubeSides, 3, 20);
@@ -205,13 +213,13 @@ int main() {
     ourShader.setVec3("lightPos", lightPos);
     ourShader.setVec3("viewPos", camera.Position);
     ourShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
+    ourShader.setMat4("view", view);
 
     // Floor
     if (myRope.showFloor) {
       ourShader.setVec3("objectColor", 0.5f, 0.5f, 0.5f);
       glm::mat4 modelFloor = glm::mat4(1.0f);
       ourShader.setMat4("model", modelFloor);
-      ourShader.setMat4("view", view);
       ourShader.setMat4("projection", projection);
       ourShader.setBool("useLighting", true);
 
@@ -223,7 +231,6 @@ int main() {
     if (myRope.showSphere) {
       glm::mat4 modelSphere = glm::mat4(1.0f);
       ourShader.setMat4("model", modelSphere);
-      ourShader.setMat4("view", view);
       ourShader.setMat4("projection", projection);
       ourShader.setBool("useLighting", true);
       ourShader.setVec3("objectColor", 0.7f, 0.5f, 0.5f);
