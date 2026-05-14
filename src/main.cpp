@@ -18,7 +18,9 @@
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
-glm::vec3 GetRayFromMouse(double mouseX, double mouseY, int screenWidth, int screenHeight, const glm::mat4& view, const glm::mat4& projection);
+glm::vec3 GetRayFromMouse(double mouseX, double mouseY, int screenWidth,
+                          int screenHeight, const glm::mat4 &view,
+                          const glm::mat4 &projection);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -147,6 +149,51 @@ int main() {
                         (void *)(sizeof(glm::vec3)));
   glEnableVertexAttribArray(1);
 
+  // Box
+  float bx0 = myRope.boxMin.x, by0 = myRope.boxMin.y, bz0 = myRope.boxMin.z;
+  float bx1 = myRope.boxMax.x, by1 = myRope.boxMax.y, bz1 = myRope.boxMax.z;
+
+  float boxVertices[] = {
+      // back face
+      bx0, by0, bz0, 0.0f, 0.0f, -1.0f, bx1, by1, bz0, 0.0f, 0.0f, -1.0f,
+      bx1, by0, bz0, 0.0f, 0.0f, -1.0f, bx1, by1, bz0, 0.0f, 0.0f, -1.0f,
+      bx0, by0, bz0, 0.0f, 0.0f, -1.0f, bx0, by1, bz0, 0.0f, 0.0f, -1.0f,
+      // front face
+      bx0, by0, bz1, 0.0f, 0.0f, 1.0f, bx1, by0, bz1, 0.0f, 0.0f, 1.0f,
+      bx1, by1, bz1, 0.0f, 0.0f, 1.0f, bx1, by1, bz1, 0.0f, 0.0f, 1.0f,
+      bx0, by1, bz1, 0.0f, 0.0f, 1.0f, bx0, by0, bz1, 0.0f, 0.0f, 1.0f,
+      // left face
+      bx0, by1, bz1, -1.0f, 0.0f, 0.0f, bx0, by1, bz0, -1.0f, 0.0f, 0.0f,
+      bx0, by0, bz0, -1.0f, 0.0f, 0.0f, bx0, by0, bz0, -1.0f, 0.0f, 0.0f,
+      bx0, by0, bz1, -1.0f, 0.0f, 0.0f, bx0, by1, bz1, -1.0f, 0.0f, 0.0f,
+      // right face
+      bx1, by1, bz1, 1.0f, 0.0f, 0.0f, bx1, by0, bz0, 1.0f, 0.0f, 0.0f,
+      bx1, by1, bz0, 1.0f, 0.0f, 0.0f, bx1, by0, bz0, 1.0f, 0.0f, 0.0f,
+      bx1, by1, bz1, 1.0f, 0.0f, 0.0f, bx1, by0, bz1, 1.0f, 0.0f, 0.0f,
+      // bottom face
+      bx0, by0, bz0, 0.0f, -1.0f, 0.0f, bx1, by0, bz0, 0.0f, -1.0f, 0.0f,
+      bx1, by0, bz1, 0.0f, -1.0f, 0.0f, bx1, by0, bz1, 0.0f, -1.0f, 0.0f,
+      bx0, by0, bz1, 0.0f, -1.0f, 0.0f, bx0, by0, bz0, 0.0f, -1.0f, 0.0f,
+      // top face
+      bx0, by1, bz0, 0.0f, 1.0f, 0.0f, bx1, by1, bz1, 0.0f, 1.0f, 0.0f,
+      bx1, by1, bz0, 0.0f, 1.0f, 0.0f, bx1, by1, bz1, 0.0f, 1.0f, 0.0f,
+      bx0, by1, bz0, 0.0f, 1.0f, 0.0f, bx0, by1, bz1, 0.0f, 1.0f, 0.0f};
+
+  GLuint boxVAO, boxVBO;
+  glGenVertexArrays(1, &boxVAO);
+  glGenBuffers(1, &boxVBO);
+  glBindVertexArray(boxVAO);
+  glBindBuffer(GL_ARRAY_BUFFER, boxVBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(boxVertices), boxVertices,
+               GL_STATIC_DRAW);
+  // Positions
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  // Normals
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
   // Unbind
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
@@ -176,7 +223,8 @@ int main() {
       glfwGetWindowSize(window, &winWidth, &winHeight);
 
       if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-        glm::vec3 rayDir = GetRayFromMouse(mouseX, mouseY, winWidth, winHeight, view, projection);
+        glm::vec3 rayDir = GetRayFromMouse(mouseX, mouseY, winWidth, winHeight,
+                                           view, projection);
         glm::vec3 rayOrigin = camera.Position;
 
         if (draggedParticle == -1) {
@@ -211,7 +259,8 @@ int main() {
       } else {
         if (draggedParticle != -1) {
           myRope.particles[draggedParticle].pinned =
-              (draggedParticle == 0 || (draggedParticle == myRope.numParticles - 1 && myRope.pinLast));
+              (draggedParticle == 0 ||
+               (draggedParticle == myRope.numParticles - 1 && myRope.pinLast));
           draggedParticle = -1;
         }
       }
@@ -242,6 +291,7 @@ int main() {
     ImGui::Text("Scenarios");
     ImGui::Checkbox("Show Floor", &myRope.showFloor);
     ImGui::Checkbox("Show Sphere", &myRope.showSphere);
+    ImGui::Checkbox("Show Box", &myRope.showBox);
     if (ImGui::Checkbox("Pin Last", &myRope.pinLast)) {
       myRope.reset();
     }
@@ -294,6 +344,17 @@ int main() {
       glDrawArrays(GL_TRIANGLES, 0, sphereData.size() / 2);
     }
 
+    // Box
+    if (myRope.showBox) {
+      ourShader.setVec3("objectColor", 0.5f, 0.7f, 0.5f);
+      ourShader.setMat4("model", glm::mat4(1.0f));
+      ourShader.setMat4("projection", projection);
+      ourShader.setBool("useLighting", true);
+
+      glBindVertexArray(boxVAO);
+      glDrawArrays(GL_TRIANGLES, 0, 36);
+    }
+
     // Update simulation
     if (deltaTime > 0.0f) {
       myRope.update(deltaTime);
@@ -323,6 +384,8 @@ int main() {
   // De-allocate resources
   glDeleteVertexArrays(1, &ropeVAO);
   glDeleteBuffers(1, &ropeVBO);
+  glDeleteVertexArrays(1, &boxVAO);
+  glDeleteBuffers(1, &boxVBO);
 
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
@@ -379,7 +442,9 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
   }
 }
 
-glm::vec3 GetRayFromMouse(double mouseX, double mouseY, int screenWidth, int screenHeight, const glm::mat4& view, const glm::mat4& projection) {
+glm::vec3 GetRayFromMouse(double mouseX, double mouseY, int screenWidth,
+                          int screenHeight, const glm::mat4 &view,
+                          const glm::mat4 &projection) {
   float x = (2.0f * mouseX) / screenWidth - 1.0f;
   float y = 1.0f - (2.0f * mouseY) / screenHeight;
 

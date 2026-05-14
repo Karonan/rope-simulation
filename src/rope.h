@@ -101,6 +101,7 @@ public:
   // MARK: update
   bool showFloor = true;
   bool showSphere = true;
+  bool showBox = false;
   bool enableGravity = true;
   int subSteps = 10;
 
@@ -133,6 +134,9 @@ public:
       }
       if (showSphere) {
         solveSphereCollision();
+      }
+      if (showBox) {
+        solveBoxCollision();
       }
     }
   }
@@ -260,6 +264,70 @@ public:
         p.pos = surface;
         p.prevPos = surface - vReflected;
       }
+    }
+  }
+
+  // MARK: solve box collision
+  glm::vec3 boxMin = glm::vec3(-0.05f, -0.05f, -0.3f);
+  glm::vec3 boxMax = glm::vec3(0.05f, 0.05f, 0.3f);
+
+  void solveBoxCollision() {
+    for (auto &p : particles) {
+      if (p.pinned)
+        continue;
+
+      // not inside box, skip
+      if (p.pos.x < boxMin.x || p.pos.x > boxMax.x)
+        continue;
+      if (p.pos.y < boxMin.y || p.pos.y > boxMax.y)
+        continue;
+      if (p.pos.z < boxMin.z || p.pos.z > boxMax.z)
+        continue;
+
+      // find shallowest penetration axis
+      float dists[6] = {
+          p.pos.x - boxMin.x, boxMax.x - p.pos.x, p.pos.y - boxMin.y,
+          boxMax.y - p.pos.y, p.pos.z - boxMin.z, boxMax.z - p.pos.z,
+      };
+
+      int minAxis = 0;
+      for (int i = 1; i < 6; i++)
+        if (dists[i] < dists[minAxis])
+          minAxis = i;
+
+      // push out along shallowest axis
+      glm::vec3 normal = glm::vec3(0.0f);
+      float penetration = dists[minAxis];
+      if (minAxis == 0) {
+        normal = glm::vec3(-1, 0, 0);
+        p.pos.x = boxMin.x;
+      }
+      if (minAxis == 1) {
+        normal = glm::vec3(1, 0, 0);
+        p.pos.x = boxMax.x;
+      }
+      if (minAxis == 2) {
+        normal = glm::vec3(0, -1, 0);
+        p.pos.y = boxMin.y;
+      }
+      if (minAxis == 3) {
+        normal = glm::vec3(0, 1, 0);
+        p.pos.y = boxMax.y;
+      }
+      if (minAxis == 4) {
+        normal = glm::vec3(0, 0, -1);
+        p.pos.z = boxMin.z;
+      }
+      if (minAxis == 5) {
+        normal = glm::vec3(0, 0, 1);
+        p.pos.z = boxMax.z;
+      }
+
+      // velocity reflection along normal (restitution)
+      glm::vec3 vel = p.pos - p.prevPos;
+      float velN = glm::dot(vel, normal);
+      if (velN < 0.0f)
+        p.prevPos += normal * velN * (1.0f + restitution);
     }
   }
 };
